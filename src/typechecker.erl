@@ -1261,9 +1261,14 @@ type_check_expr(Env, {var, P, Var}) ->
         #{} ->
             throw({unknown_variable, P, Var})
     end;
-type_check_expr(Env, {match, _, Pat, Expr}) ->
+type_check_expr(Env, {match, P, Pat, Expr}) ->
     {Ty, VarBinds, Cs} = type_check_expr(Env, Expr),
-    {_PatTy, UBound, Env2, Cs2} = add_type_pat(Pat, Ty, Env#env.tenv, VarBinds),
+    NormTy = normalize(Ty, Env#env.tenv),
+    {_PatTy, UBoundNorm, Env2, Cs2} =
+            ?throw_orig_type(add_type_pat(Pat, NormTy, Env#env.tenv, VarBinds),
+                             Ty, NormTy),
+    UBound = case UBoundNorm of NormTy -> Ty;
+                                _Other -> UBoundNorm end,
     {UBound, Env2, constraints:combine(Cs,Cs2)};
 type_check_expr(Env, {'if', _, Clauses}) ->
     infer_clauses(Env, Clauses);
@@ -2974,6 +2979,8 @@ refine_ty(_Ty, ?type(none), _TEnv) ->
     %% PatTy none() means the pattern can't be used for refinement,
     %% because there is imprecision.
     throw(no_refinement);
+refine_ty(?type(T, A), ?type(T, A), _) ->
+    type(none);
 refine_ty(?type(union, UnionTys), Ty, TEnv) ->
     RefTys = lists:foldr(fun (UnionTy, Acc) ->
                              try refine(UnionTy, Ty, TEnv) of
@@ -2996,8 +3003,6 @@ refine_ty({ann_type, _, [_, Ty1]}, Ty2, TEnv) ->
     refine_ty(Ty1, Ty2, TEnv);
 refine_ty(Ty1, {ann_type, _, [_, Ty2]}, TEnv) ->
     refine_ty(Ty1, Ty2, TEnv);
-refine_ty(?type(T, A), ?type(T, A), _) ->
-    type(none);
 refine_ty({atom, _, A}, {atom, _, A}, _) ->
     type(none);
 refine_ty(?type(list, A), ?type(nil), _TEnv) ->
@@ -3191,7 +3196,7 @@ add_type_pat(Lit = {float, P, _}, Ty, TEnv, VEnv) ->
             throw({type_error, pattern, P, Lit, Ty})
     end;
 add_type_pat(Tuple = {tuple, P, Pats}, Ty, TEnv, VEnv) ->
-    case expect_tuple_type(normalize(Ty, TEnv), length(Pats)) of
+    case expect_tuple_type(Ty, length(Pats)) of
         any ->
             {type(none)
             ,Ty
