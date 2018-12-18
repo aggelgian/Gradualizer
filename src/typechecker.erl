@@ -54,6 +54,7 @@
              ,venv  = #{}
              ,tenv          :: #tenv{}
              ,infer = false :: boolean()
+             ,debug = false :: boolean()
              %,tyvenv = #{}
              }).
 
@@ -1905,6 +1906,9 @@ type_check_comprehension(Env, Compr, Expr, [Guard | Quals]) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 type_check_expr_in(Env, ResTy, Expr) ->
+    Env#env.debug andalso
+        io:format("~p: Checking that ~s :: ~s~n",
+                  [element(2, Expr), erl_pp:expr(Expr), typelib:pp_type(ResTy)]),
     NormResTy = normalize(ResTy, Env#env.tenv),
     ?throw_orig_type(do_type_check_expr_in(Env, NormResTy, Expr),
                      ResTy, NormResTy).
@@ -2914,6 +2918,9 @@ check_clauses(Env, ArgsTy, ResTy, Clauses) ->
 check_clause(_Env, [?type(none)|_], _ResTy, {clause, P, _Args, _Guards, _Block}) ->
     throw({type_error, unreachable_clause, P});
 check_clause(Env, ArgsTy, ResTy, {clause, P, Args, Guards, Block}) ->
+    Env#env.debug andalso
+        io:format("~p: Checking clause :: ~s~n",
+                  [P, typelib:pp_type(ResTy)]),
     case {length(ArgsTy), length(Args)} of
         {L, L} ->
             {PatTys, _UBounds, VEnv2, Cs1} =
@@ -3066,6 +3073,8 @@ check_guards(Env, Guards) ->
                 end, Guards), Env#env.tenv).
 
 type_check_function(Env, {function,_, Name, NArgs, Clauses}) ->
+    Env#env.debug andalso
+        io:format("Checking function ~p/~p~n", [Name, NArgs]),
     case maps:find({Name, NArgs}, Env#env.fenv) of
         {ok, FunTy} ->
             check_clauses_fun(Env, expect_fun_type(Env, FunTy), Clauses);
@@ -3518,6 +3527,8 @@ type_check_forms(Forms, Opts) ->
     ParseData =
         collect_specs_types_opaques_and_functions(Forms),
     Env = create_env(ParseData, Opts),
+    Env#env.debug andalso
+        io:format("Checking module ~p~n", [ParseData#parsedata.module]),
     lists:foldr(fun (Function, Res) when Res =:= ok;
                                          not StopOnFirstError ->
                         try type_check_function(Env, Function) of
@@ -3565,7 +3576,8 @@ create_env(#parsedata{specs     = Specs
     #env{fenv = FEnv,
          tenv = TEnv,
          %% Store some type checking options in the environment
-         infer = proplists:get_bool(infer, Opts)}.
+         infer = proplists:get_bool(infer, Opts),
+         debug = proplists:get_bool(debug, Opts)}.
 
 create_tenv(TypeDefs, RecordDefs) ->
     TypeMap =

@@ -39,6 +39,8 @@ print_usage() ->
     io:format("                                 language constructs~n"),
     io:format("       --no-infer                Only use type information from function specs~n"),
     io:format("                                  - the default behaviour~n"),
+    io:format("       --debug                   Display some debug info while typechecking~n"),
+    io:format("       --no-debug                Don't display debug info (default)~n"),
     io:format("  -pa, --path-add                Add the specified directory to the beginning of~n"),
     io:format("                                 the code path; see erl -pa             [string]~n"),
     io:format("       --print-file              prefix error printouts with the file name the~n"),
@@ -58,6 +60,8 @@ parse_opts([A | Args], Opts) ->
         "--help"                   -> {[], [help]};
         "--infer"                  -> parse_opts(Args, [infer | Opts]);
         "--no-infer"               -> parse_opts(Args, [{infer, false} | Opts]);
+        "--debug"                  -> parse_opts(Args, [debug | Opts]);
+        "--no-debug"               -> parse_opts(Args, [{debug, false} | Opts]);
         "-pa"                      -> handle_path_add(A, Args, Opts);
         "--path-add"               -> handle_path_add(A, Args, Opts);
         "--print-file"             -> parse_opts(Args, [print_file | Opts]);
